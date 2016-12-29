@@ -74,13 +74,20 @@ does eventually figure out which arm is best no matter how epsilon is set. But t
 of time required to figure our which arm is best depends a lot on the value of epsilon.
     """
 
-    def __init__(self, epsilon, num_arms):
+    def __init__(self, epsilon, num_arms, is_annealing=False):
         assert 0 <= epsilon <= 1
         self.epsilon = epsilon
+        self.is_annealing = is_annealing
         self.arms = {i: ArmCounter() for i in range(num_arms)}
 
     def select_arm(self):
-        if random.random() < self.epsilon:
+        if self.is_annealing:
+            t = sum(a.total_pulls for a in self.arms.values()) + 1
+            epsilon = 1 / math.log(t + 0.0000001)
+        else:
+            epsilon = self.epsilon
+
+        if random.random() < epsilon:
             return random.choice(list(self.arms.keys()))
         else:
             return index_max([self.arms[i].payout for i in range(len(self.arms))])
@@ -89,13 +96,19 @@ of time required to figure our which arm is best depends a lot on the value of e
 
 class SoftMax(BanditAlgorithm):
 
-    def __init__(self, temperature, num_arms):
+    def __init__(self, temperature, num_arms, is_annealing=False):
         assert temperature > 0
         self.temperature = temperature
+        self.is_annealing = is_annealing
         self.arms = {i: ArmCounter() for i in range(num_arms)}
 
     def select_arm(self):
-        probabilities = {i: math.exp(counter.payout / self.temperature) for i, counter in self.arms.items()}
+        if self.is_annealing:
+            t = sum(a.total_pulls for a in self.arms.values()) + 1
+            temperature = 1 / math.log(t + 0.0000001)
+        else:
+            temperature = self.temperature
+        probabilities = {i: math.exp(counter.payout / temperature) for i, counter in self.arms.items()}
         total_probability = sum(probabilities.values())
         normalized_probabilities = {i: p / total_probability for i, p in probabilities.items()}
         return self._draw_in_proportion(normalized_probabilities)
